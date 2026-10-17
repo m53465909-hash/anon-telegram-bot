@@ -59,27 +59,23 @@ async def cmd_start(message: types.Message):
 @dp.message(lambda msg: msg.from_user.id in ADMIN_IDS and msg.reply_to_message)
 async def handle_admin_reply(message: types.Message):
     try:
-        # Ищем текст во всем сообщении (текст или подпись к фото)
         reply_text = message.reply_to_message.text or message.reply_to_message.caption
         if not reply_text or "Anon ID:" not in reply_text:
             await message.answer("❌ Ошибка: Отвечайте только на сообщения бота, содержащие 'Anon ID:'.")
             return
         
-        # Вытаскиваем анонимный хэш из строки вида "👤 Аноним (Anon ID: a8f3b2)"
         try:
-            anon_id = reply_text.split("Anon ID:").strip().split(")")[0]
+            anon_id = reply_text.split("Anon ID:")[1].split(")")[0].strip()
         except Exception:
             await message.answer("❌ Не удалось считать Anon ID из сообщения.")
             return
 
-        # Ищем реальный Telegram ID в нашей базе в памяти
         real_user_id = id_map.get(anon_id)
         
         if not real_user_id:
             await message.answer("❌ Срок действия сессии истек или пользователь не найден (бот перезапускался).")
             return
 
-        # Отправляем ответ пользователю от имени бота (Анонимно для админа)
         if message.text:
             await bot.send_message(chat_id=real_user_id, text=f"💬 **Ответ от администрации:**\n\n{message.text}", parse_mode="Markdown")
         elif message.photo:
@@ -91,6 +87,7 @@ async def handle_admin_reply(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Ошибка отправки: {e}")
+
 
 # Пересылка сообщений от пользователей всем админам
 @dp.message()
