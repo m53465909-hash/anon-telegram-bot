@@ -7,8 +7,8 @@ from aiohttp import web
 
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = "8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco"  # Токен от @BotFather
-ADMIN_IDS = [1662629295, 5208268640, 8966941202, 8614257780, 6489442860, 8854400653]  # ID админов через запятую (пример)
-SECRET_SALT = "демыч"  # Любое секретное слово для шифрования ID
+ADMIN_IDS = [1662629295, 5208268640, 8966941202, 8614257780, 6489442860, 8854400653, 8508113717]  # ID админов через запятую (пример)
+SECRET_SALT = "PodslushkaAdmins"  # Любое секретное слово для шифрования ID
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
