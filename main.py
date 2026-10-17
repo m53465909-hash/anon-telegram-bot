@@ -60,55 +60,66 @@ async def cmd_start(message: types.Message):
 async def handle_admin_reply(message: types.Message):
     try:
         reply_text = message.reply_to_message.text or message.reply_to_message.caption
-        if not reply_text or "Anon ID:" not in reply_text:
-            await message.answer("❌ Ошибка: Отвечайте только на сообщения бота, содержащие 'Anon ID:'.")
-            return
-        
-        try:
-            anon_id = reply_text.split("Anon ID:")[1].split(")")[0].strip()
-        except Exception:
-            await message.answer("❌ Не удалось считать Anon ID из сообщения.")
+        if not reply_text:
             return
 
-        real_user_id = id_map.get(anon_id)
-        
-        if not real_user_id:
-            await message.answer("❌ Срок действия сессии истек или пользователь не найден (бот перезапускался).")
-            return
-
-        # Отправляем ответ пользователю от имени бота
-        if message.text:
-            await bot.send_message(chat_id=real_user_id, text=f"💬 **Ответ от администрации:**\n\n{message.text}", parse_mode="Markdown")
-        elif message.photo:
-            await bot.send_photo(chat_id=real_user_id, photo=message.photo[-1].file_id, caption=f"💬 **Ответ от администрации:**\n\n{message.caption or ''}", parse_mode="Markdown")
-        elif message.video:
-            await bot.send_video(chat_id=real_user_id, video=message.video.file_id, caption=f"💬 **Ответ от администрации:**\n\n{message.caption or ''}", parse_mode="Markdown")
-        
-        await message.answer(f"✅ Ответ успешно отправлен пользователю `{anon_id}`!")
-
-        # --- НОВЫЙ БЛОК: Уведомляем остальных админов ---
         admin_name = message.from_user.first_name
         if message.from_user.username:
             admin_name = f"@{message.from_user.username} ({admin_name})"
-            
-        log_text = f"📢 **Админ {admin_name} ответил пользователю** `{anon_id}`:\n\n"
 
-        for admin_id in ADMIN_IDS:
-            # Отправляем копию всем, КРОМЕ того админа, который сейчас ответил
-            if admin_id != message.from_user.id:
-                try:
-                    if message.text:
-                        await bot.send_message(chat_id=admin_id, text=log_text + message.text, parse_mode="Markdown")
-                    elif message.photo:
-                        await bot.send_photo(chat_id=admin_id, photo=message.photo[-1].file_id, caption=log_text + (message.caption or ""), parse_mode="Markdown")
-                    elif message.video:
-                        await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=log_text + (message.caption or ""), parse_mode="Markdown")
-                except Exception as e:
-                    print(f"Не удалось отправить лог админу {admin_id}: {e}")
-        # -----------------------------------------------
-        
+        # --- СЦЕНАРИЙ 1: Ответ пользователю ---
+        if "Anon ID:" in reply_text:
+            try:
+                anon_id = reply_text.split("Anon ID:")[1].split(")")[0].strip()
+            except Exception:
+                await message.answer("❌ Не удалось считать Anon ID из сообщения.")
+                return
+
+            real_user_id = id_map.get(anon_id)
+            if not real_user_id:
+                await message.answer("❌ Срок действия сессии истек или пользователь не найден.")
+                return
+
+            if message.text:
+                await bot.send_message(chat_id=real_user_id, text=f"💬 **Ответ от администрации:**\n\n{message.text}", parse_mode="Markdown")
+            elif message.photo:
+                await bot.send_photo(chat_id=real_user_id, photo=message.photo[-1].file_id, caption=f"💬 **Ответ от администрации:**\n\n{message.caption or ''}", parse_mode="Markdown")
+            elif message.video:
+                await bot.send_video(chat_id=real_user_id, video=message.video.file_id, caption=f"💬 **Ответ от администрации:**\n\n{message.caption or ''}", parse_mode="Markdown")
+            
+            await message.answer(f"✅ Ответ успешно отправлен пользователю `{anon_id}`!")
+
+            log_text = f"📢 **Админ {admin_name} ответил пользователю** `{anon_id}`:\n\n"
+            for admin_id in ADMIN_IDS:
+                if admin_id != message.from_user.id:
+                    try:
+                        if message.text:
+                            await bot.send_message(chat_id=admin_id, text=log_text + message.text, parse_mode="Markdown")
+                        elif message.photo:
+                            await bot.send_photo(chat_id=admin_id, photo=message.photo[-1].file_id, caption=log_text + (message.caption or ""), parse_mode="Markdown")
+                        elif message.video:
+                            await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=log_text + (message.caption or ""), parse_mode="Markdown")
+                    except Exception as e:
+                        print(f"Не удалось отправить лог админу {admin_id}: {e}")
+
+        # --- СЦЕНАРИЙ 2: Внутренний чат админов ---
+        elif "📢 Админ" in reply_text or "💬 Внутреннее обсуждение" in reply_text:
+            chat_text = f"💬 **Внутреннее обсуждение**\n✍️ от {admin_name}:\n\n"
+            
+            for admin_id in ADMIN_IDS:
+                if admin_id != message.from_user.id:
+                    try:
+                        if message.text:
+                            await bot.send_message(chat_id=admin_id, text=chat_text + message.text, parse_mode="Markdown")
+                        elif message.photo:
+                            await bot.send_photo(chat_id=admin_id, photo=message.photo[-1].file_id, caption=chat_text + (message.caption or ""), parse_mode="Markdown")
+                        elif message.video:
+                            await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=chat_text + (message.caption or ""), parse_mode="Markdown")
+                    except Exception as e:
+                        print(f"Не удалось переслать сообщение админу {admin_id}: {e}")
+
     except Exception as e:
-        await message.answer(f"❌ Ошибка отправки: {e}")
+        await message.answer(f"❌ Ошибка в админ-панели: {e}")
 
 
 # Пересылка сообщений от пользователей всем админам
