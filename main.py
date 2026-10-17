@@ -76,6 +76,7 @@ async def handle_admin_reply(message: types.Message):
             await message.answer("❌ Срок действия сессии истек или пользователь не найден (бот перезапускался).")
             return
 
+        # Отправляем ответ пользователю от имени бота
         if message.text:
             await bot.send_message(chat_id=real_user_id, text=f"💬 **Ответ от администрации:**\n\n{message.text}", parse_mode="Markdown")
         elif message.photo:
@@ -84,6 +85,27 @@ async def handle_admin_reply(message: types.Message):
             await bot.send_video(chat_id=real_user_id, video=message.video.file_id, caption=f"💬 **Ответ от администрации:**\n\n{message.caption or ''}", parse_mode="Markdown")
         
         await message.answer(f"✅ Ответ успешно отправлен пользователю `{anon_id}`!")
+
+        # --- НОВЫЙ БЛОК: Уведомляем остальных админов ---
+        admin_name = message.from_user.first_name
+        if message.from_user.username:
+            admin_name = f"@{message.from_user.username} ({admin_name})"
+            
+        log_text = f"📢 **Админ {admin_name} ответил пользователю** `{anon_id}`:\n\n"
+
+        for admin_id in ADMIN_IDS:
+            # Отправляем копию всем, КРОМЕ того админа, который сейчас ответил
+            if admin_id != message.from_user.id:
+                try:
+                    if message.text:
+                        await bot.send_message(chat_id=admin_id, text=log_text + message.text, parse_mode="Markdown")
+                    elif message.photo:
+                        await bot.send_photo(chat_id=admin_id, photo=message.photo[-1].file_id, caption=log_text + (message.caption or ""), parse_mode="Markdown")
+                    elif message.video:
+                        await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=log_text + (message.caption or ""), parse_mode="Markdown")
+                except Exception as e:
+                    print(f"Не удалось отправить лог админу {admin_id}: {e}")
+        # -----------------------------------------------
         
     except Exception as e:
         await message.answer(f"❌ Ошибка отправки: {e}")
