@@ -4,8 +4,8 @@ import hashlib
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or "ВАШ_ТОКЕН_БОТА"  
-ADMIN_IDS = []  # Вставь сюда ID админов через запятую
+BOT_TOKEN = os.environ.get("8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco") or "8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco"  
+ADMIN_IDS = [8508113717, 8854400653, 6489442860, 8614257780, 8966941202, 5208268640, 1662629295]  # Вставь сюда ID админов через запятую
 SECRET_SALT = "super_secret_salt_123"  
 
 bot = Bot(token=BOT_TOKEN)
