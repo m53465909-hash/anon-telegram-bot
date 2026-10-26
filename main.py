@@ -32,13 +32,12 @@ async def cmd_start(message: types.Message):
         await message.answer(
             "👋 Привет, админ!\n\n"
             "Сюда приходят анонимные сообщения.\n"
-            "Чтобы ответить пользователю, сделайте **REPLY (Ответить)**.\n"
             "Нажмите на кнопку под сообщением, чтобы бот сам автоматически выложил текст в канал."
         )
     else:
         await message.answer(
             "👋 Привет! Напиши сюда любое сообщение, вопрос или отзыв.\n\n"
-            "Администраторы получат его **абсолютно анонимно**."
+            "Администраторы получат его абсолютно анонимно."
         )
 
 # Обработчик нажатия кнопки "Опубликовать в канал" для админов
@@ -99,7 +98,7 @@ async def handle_admin_reply(message: types.Message):
             return
 
         if message.text:
-            await bot.send_message(chat_id=real_user_id, text=f"💬 **Ответ от администрации:**\n\n{message.text}", parse_mode="Markdown")
+            await bot.send_message(chat_id=real_user_id, text=f"💬 Ответ от администрации:\n\n{message.text}", parse_mode="Markdown")
         
         await message.answer(f"✅ Ответ успешно отправлен пользователю `{anon_id}`!")
 
@@ -114,7 +113,7 @@ async def handle_user_message(message: types.Message):
     anon_id = get_anonymous_id(message.from_user.id)
     id_map[anon_id] = message.from_user.id
     
-    info_header = f"👤 **Анонимное сообщение** (Anon ID: `{anon_id}`)\n\n"
+    info_header = f"👤 Анонимное сообщение (Anon ID: `{anon_id}`)\n\n"
     kb = get_post_keyboard(anon_id)
 
     for admin_id in ADMIN_IDS:
