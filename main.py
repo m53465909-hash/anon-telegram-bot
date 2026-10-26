@@ -1,14 +1,14 @@
 import os
 import asyncio
 import hashlib
+import urllib.parse
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
-from aiohttp import web
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-# --- НАСТРОЙКИ ---
-BOT_TOKEN = "8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco"  # Токен от @BotFather
-ADMIN_IDS = [1662629295, 5208268640, 8966941202, 8614257780, 6489442860, 8854400653, 8508113717]  # ID админов через запятую (пример)
-SECRET_SALT = "PodslushkaAdmins"  # Любое секретное слово для шифрования ID
+BOT_TOKEN = os.environ.get("8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco") or "8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco"  
+ADMIN_IDS = [1662629295, 5208268640, 8966941202, 8614257780, 6489442860, 8854400653, 8508113717]  # Вставь сюда ID админов через запятую
+SECRET_SALT = "super_secret_salt_123"  
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -20,13 +20,29 @@ def get_anonymous_id(user_id: int) -> str:
 
 id_map = {}
 
+def get_share_keyboard(text_to_share: str):
+    # Кодируем текст, чтобы Telegram правильно его переварил в ссылке
+    encoded_text = urllib.parse.quote(text_to_share)
+    
+    # Ссылка на наше кастомное Web App с красивой анимацией публикации
+    # Параметр text передает чистый текст сообщения пользователя
+    web_app_url = f"https://github.io{encoded_text}"
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🚀 Опубликовать в канал (с анимацией)", 
+        web_app=types.WebAppInfo(url=web_app_url)
+    )
+    return builder.as_markup()
+
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
         await message.answer(
             "👋 Привет, админ!\n\n"
             "Сюда будут приходить сообщения от пользователей. Их личности полностью скрыты.\n"
-            "Чтобы ответить пользователю, просто сделайте **REPLY (Ответить)** на сообщение бота."
+            "Чтобы ответить пользователю, просто сделайте **REPLY (Ответить)** на сообщение бота.\n"
+            "Под каждым сообщением есть кнопка для быстрой публикации текста в канал без добавления бота в админы."
         )
     else:
         await message.answer(
@@ -48,7 +64,7 @@ async def handle_admin_reply(message: types.Message):
 
         if "Anon ID:" in reply_text:
             try:
-                anon_id = reply_text.split("Anon ID:")[1].split(")")[0].strip()
+                anon_id = reply_text.split("Anon ID:").split(")").strip()
             except Exception:
                 await message.answer("❌ Не удалось считать Anon ID из сообщения.")
                 return
@@ -104,18 +120,23 @@ async def handle_user_message(message: types.Message):
 
     anon_id = get_anonymous_id(message.from_user.id)
     id_map[anon_id] = message.from_user.id
+    
+    # Текст пользователя, который мы будем пересылать (без шапки анонима)
+    user_text = message.text or message.caption or ""
 
     info_header = f"👤 **Анонимное сообщение** (Anon ID: `{anon_id}`)\n\n"
+    kb = get_share_keyboard(user_text)
+
     for admin_id in ADMIN_IDS:
         try:
             if message.text:
-                await bot.send_message(chat_id=admin_id, text=info_header + message.text, parse_mode="Markdown")
+                await bot.send_message(chat_id=admin_id, text=info_header + message.text, reply_markup=kb)
             elif message.photo:
-                await bot.send_photo(chat_id=admin_id, photo=message.photo[-1].file_id, caption=info_header + (message.caption or ""), parse_mode="Markdown")
+                await bot.send_photo(chat_id=admin_id, photo=message.photo[-1].file_id, caption=info_header + (message.caption or ""), reply_markup=kb)
             elif message.video:
-                await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=info_header + (message.caption or ""), parse_mode="Markdown")
+                await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=info_header + (message.caption or ""), reply_markup=kb)
             elif message.document:
-                await bot.send_document(chat_id=admin_id, document=message.document.file_id, caption=info_header + (message.caption or ""), parse_mode="Markdown")
+                await bot.send_document(chat_id=admin_id, document=message.document.file_id, caption=info_header + (message.caption or ""), reply_markup=kb)
         except Exception as e:
             print(f"Не удалось доставить админу {admin_id}: {e}")
             
