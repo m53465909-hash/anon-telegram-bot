@@ -3,10 +3,12 @@ import asyncio
 import hashlib
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
+from aiohttp import web
 
-BOT_TOKEN = os.environ.get("8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco") or "8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco"  
-ADMIN_IDS = [8508113717, 8854400653, 6489442860, 8614257780, 8966941202, 5208268640, 1662629295]  # Вставь сюда ID админов через запятую
-SECRET_SALT = "super_secret_salt_123"  
+# --- НАСТРОЙКИ ---
+BOT_TOKEN = "8751774975:AAHd6rI1cWvYHqEW280OJIx8SQzx_Iw6dco"  # Токен от @BotFather
+ADMIN_IDS = [1662629295, 5208268640, 8966941202, 8614257780, 6489442860, 8854400653, 8508113717]  # ID админов через запятую (пример)
+SECRET_SALT = "PodslushkaAdmins"  # Любое секретное слово для шифрования ID
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
