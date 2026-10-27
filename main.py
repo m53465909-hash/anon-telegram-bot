@@ -20,7 +20,6 @@ def get_anonymous_id(user_id: int) -> str:
 
 id_map = {}
 
-# Функция создания инлайн-кнопки с callback_data, чтобы бот сам обрабатывал нажатие
 def get_post_keyboard(anon_id: str):
     builder = InlineKeyboardBuilder()
     builder.button(text="📢 Опубликовать в канал", callback_data=f"post_{anon_id}")
@@ -32,7 +31,8 @@ async def cmd_start(message: types.Message):
         await message.answer(
             "👋 Привет, админ!\n\n"
             "Сюда приходят анонимные сообщения.\n"
-            "Нажмите на кнопку под сообщением, чтобы бот сам автоматически выложил текст в канал."
+            "Чтобы ответить пользователю, сделайте REPLY (Ответить).\n"
+            "Нажмите на кнопку под сообщением, чтобы выложить чистый текст в канал. После этого в боте у сообщения появится зелёный кружок."
         )
     else:
         await message.answer(
@@ -40,38 +40,47 @@ async def cmd_start(message: types.Message):
             "Администраторы получат его абсолютно анонимно."
         )
 
-# Обработчик нажатия кнопки "Опубликовать в канал" для админов
 @dp.callback_query(lambda c: c.data.startswith("post_") and c.from_user.id in ADMIN_IDS)
 async def process_post_to_channel(callback_query: types.CallbackQuery):
     try:
-        anon_id = callback_query.data.split("_")
+        anon_id = callback_query.data.split("_")[1]
         
-        # Получаем текст исходного сообщения админа, убирая "шапку" анонима
         reply_text = callback_query.message.text or callback_query.message.caption
         if not reply_text:
             await callback_query.answer("❌ Ошибка: Нет текста для публикации.", show_alert=True)
             return
 
-        # Отсекаем служебную шапку "👤 Анонимное сообщение (Anon ID: ...)"
-        actual_text = reply_text.split(f"(Anon ID: {anon_id})")[-1].strip()
+        header_marker = f"(Anon ID: {anon_id})"
+        if header_marker in reply_text:
+            user_raw_text = reply_text.split(header_marker)[1].strip()
+        else:
+            user_raw_text = reply_text.strip()
 
-        # Бот сам отправляет чистый текст в канал
         if callback_query.message.text:
-            await bot.send_message(chat_id=CHANNEL_ID, text=actual_text)
+            await bot.send_message(chat_id=CHANNEL_ID, text=user_raw_text)
         elif callback_query.message.photo:
-            await bot.send_photo(chat_id=CHANNEL_ID, photo=callback_query.message.photo[-1].file_id, caption=actual_text)
+            await bot.send_photo(chat_id=CHANNEL_ID, photo=callback_query.message.photo[-1].file_id, caption=user_raw_text)
         elif callback_query.message.video:
-            await bot.send_video(chat_id=CHANNEL_ID, video=callback_query.message.video.file_id, caption=actual_text)
+            await bot.send_video(chat_id=CHANNEL_ID, video=callback_query.message.video.file_id, caption=user_raw_text)
 
-        # Меняем кнопку на текст, чтобы никто не нажал её повторно
-        await bot.edit_message_reply_markup(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-            reply_markup=None
-        )
+        updated_bot_text = f"🟢 {reply_text}"
+
+        if callback_query.message.text:
+            await bot.edit_message_text(
+                text=updated_bot_text,
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=None
+            )
+        elif callback_query.message.photo or callback_query.message.video:
+            await bot.edit_message_caption(
+                caption=updated_bot_text,
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=None
+            )
         
-        await callback_query.message.reply(f"✅ Сообщение пользователя `{anon_id}` успешно опубликовано в канал!")
-        await callback_query.answer("Опубликовано!")
+        await callback_query.answer("Успешно опубликовано!", show_alert=False)
 
     except Exception as e:
         await callback_query.answer(f"❌ Ошибка публикации: {e}", show_alert=True)
@@ -83,12 +92,10 @@ async def handle_admin_reply(message: types.Message):
         if not reply_text or "Anon ID:" not in reply_text:
             return
 
-        admin_name = message.from_user.first_name
-        if message.from_user.username:
-            admin_name = f"@{message.from_user.username} ({admin_name})"
-
         try:
-            anon_id = reply_text.split("Anon ID:").split(")").strip()
+            clean_reply = reply_text.replace("🟢", "").strip()
+            parts = clean_reply.split("Anon ID:")
+            anon_id = parts[1].split(")")[0].strip()
         except Exception:
             return
 
@@ -98,9 +105,9 @@ async def handle_admin_reply(message: types.Message):
             return
 
         if message.text:
-            await bot.send_message(chat_id=real_user_id, text=f"💬 Ответ от администрации:\n\n{message.text}", parse_mode="Markdown")
+            await bot.send_message(chat_id=real_user_id, text=f"💬 Ответ от администрации:\n\n{message.text}")
         
-        await message.answer(f"✅ Ответ успешно отправлен пользователю `{anon_id}`!")
+        await message.answer(f"✅ Ответ успешно отправлен пользователю {anon_id}!")
 
     except Exception as e:
         await message.answer(f"❌ Ошибка в админ-панели: {e}")
@@ -113,7 +120,7 @@ async def handle_user_message(message: types.Message):
     anon_id = get_anonymous_id(message.from_user.id)
     id_map[anon_id] = message.from_user.id
     
-    info_header = f"👤 Анонимное сообщение (Anon ID: `{anon_id}`)\n\n"
+    info_header = f"👤 Анонимное сообщение (Anon ID: {anon_id})\n\n"
     kb = get_post_keyboard(anon_id)
 
     for admin_id in ADMIN_IDS:
