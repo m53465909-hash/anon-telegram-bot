@@ -18,7 +18,9 @@ def get_anonymous_id(user_id: int) -> str:
     hash_obj = hashlib.sha256(raw_str.encode())
     return hash_obj.hexdigest()[:8]
 
-id_map = {}
+# Словари для хранения связей в памяти бота
+id_map = {}       # anon_id -> real_user_id (для ответов)
+text_map = {}     # anon_id -> оригинальный чистый текст (для публикации)
 
 def get_post_keyboard(anon_id: str):
     builder = InlineKeyboardBuilder()
@@ -45,17 +47,14 @@ async def process_post_to_channel(callback_query: types.CallbackQuery):
     try:
         anon_id = callback_query.data.split("_")[1]
         
-        reply_text = callback_query.message.text or callback_query.message.caption
-        if not reply_text:
-            await callback_query.answer("❌ Ошибка: Нет текста для публикации.", show_alert=True)
+        # Достаем оригинальный чистый текст из памяти бота
+        user_raw_text = text_map.get(anon_id)
+        
+        if not user_raw_text:
+            await callback_query.answer("❌ Ошибка: Оригинальный текст сообщения не найден в памяти (возможно, бот перезагружался).", show_alert=True)
             return
 
-        header_marker = f"(Anon ID: {anon_id})"
-        if header_marker in reply_text:
-            user_raw_text = reply_text.split(header_marker)[1].strip()
-        else:
-            user_raw_text = reply_text.strip()
-
+        # Публикуем АБСОЛЮТНО ЧИСТЫЙ текст в канал
         if callback_query.message.text:
             await bot.send_message(chat_id=CHANNEL_ID, text=user_raw_text)
         elif callback_query.message.photo:
@@ -63,7 +62,9 @@ async def process_post_to_channel(callback_query: types.CallbackQuery):
         elif callback_query.message.video:
             await bot.send_video(chat_id=CHANNEL_ID, video=callback_query.message.video.file_id, caption=user_raw_text)
 
-        updated_bot_text = f"🟢 {reply_text}"
+        # Добавляем зелёный кружок только для админов внутри бота
+        original_bot_text = callback_query.message.text or callback_query.message.caption or ""
+        updated_bot_text = f"🟢 {original_bot_text}"
 
         if callback_query.message.text:
             await bot.edit_message_text(
@@ -119,6 +120,10 @@ async def handle_user_message(message: types.Message):
 
     anon_id = get_anonymous_id(message.from_user.id)
     id_map[anon_id] = message.from_user.id
+    
+    # СОХРАНЯЕМ ОРИГИНАЛ: Запоминаем чистый текст пользователя в память перед отправкой админам
+    pure_text = message.text or message.caption or ""
+    text_map[anon_id] = pure_text
     
     info_header = f"👤 Анонимное сообщение (Anon ID: {anon_id})\n\n"
     kb = get_post_keyboard(anon_id)
